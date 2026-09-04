@@ -7,3 +7,7 @@ import App from './components/App.vue'
 const app = createApp(App)
 app.use(router) //Le decimos a Vue que use el router
 app.mount('#app')
+
+
+const cors = require('cors');
+app.use(cors()); // para conectar el back al frontend
