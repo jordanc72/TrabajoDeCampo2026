@@ -72,8 +72,8 @@ const handleLogin = () => {
 }
 
 .logo img {
-  width: 100%;       /* Ocupará el ancho máximo permitido por su contenedor... */
-  max-width: 250px;  /* ...pero nunca pasará de los 250px para no quedar gigante */
+  width: 100%;       /* Ocupa el ancho máximo permitido por su contenedor*/
+  max-width: 250px;  /* nunca pasará de los 250px para no quedar gigante */
   height: auto;      /* Mantiene la proporción original sin deformarse */
   object-fit: contain; /* Asegura que la imagen encaje perfectamente */
 }

@@ -2,31 +2,66 @@
   <div class="totem-container">
     <!-- Encabezado -->
     <header class="header">
-      <div class="logo-placeholder">🎓</div>
-      <h1>Información Académica</h1>
+      <div class="logo"><img src="../assets/unpaz.png" alt="Logo Universidad" /></div>
+      <!-- <h1>Información cursadas</h1> -->
     </header>
 
     <!-- Contenido Principal -->
     <main class="main-content">
       
-      <!-- Sección de Filtros -->
-      <section class="filters">
-        <div class="filter-group">
-          <label for="carrera">Seleccionar Carrera:</label>
-          <select id="carrera" class="select-input">
-            <option value="">Todas las carreras...</option>
-            <option value="sistemas">Ingeniería en Sistemas</option>
-            <option value="administracion">Administración de Empresas</option>
-          </select>
-        </div>
 
-        <div class="filter-group">
-          <label for="piso">Piso:</label>
-          <select id="piso" class="select-input">
-            <option value="">Todos los pisos...</option>
-            <option value="1">Piso 1</option>
-            <option value="2">Piso 2</option>
-          </select>
+        <section class="carrusel-section">
+          <transition name="fade" mode="out-in">
+            <div :key="indiceActual" class="slide-noticia">
+              <h2>{{ noticias[indiceActual].titulo }}</h2>
+            </div>
+          </transition>
+        </section>
+     <!-- Sección de Filtros Avanzados -->
+      <section class="filtros-container">
+        <div class="filtros-header">
+          <span>Filtro</span>
+          <span class="icon-up">▲</span>
+        </div>
+        
+        <div class="filtros-body">
+
+          <div class="form-row">
+            <label>Carrera</label>
+            <select v-model="filtros.propuesta" class="dark-select">
+              <option value="">-- Seleccione --</option>
+              <option value="LGTI">LGTI</option>
+              <option value="Enfermeria">Enfermería</option>
+            </select>
+          </div>
+          <div class="form-row-grid">
+            <div class="grid-col">
+              <label>Sede</label>
+              <select v-model="filtros.ubicacion" class="dark-select">
+                <option value="">-- Todas --</option>
+                <option value="sede-central">Alem</option>
+              </select>
+            </div>
+            
+            <div class="grid-col">
+              <label>Día de la semana</label>
+              <select v-model="filtros.dia" class="dark-select">
+                <option value="">-- Seleccione --</option>
+                <option value="lunes">Lunes</option>
+                <option value="martes">Martes</option>
+              </select>
+            </div>
+            
+            <div class="grid-col">
+              <label>Turno</label>
+              <select v-model="filtros.turno" class="dark-select">
+                <option value="">-- Seleccione --</option>
+                <option value="manana">Mañana</option>
+                <option value="manana">tarde</option>
+                <option value="noche">Noche</option>
+              </select>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -44,15 +79,15 @@
           <tbody>
             <tr>
               <td>08:00 - 10:00</td>
-              <td>Algoritmos y Estructuras de Datos</td>
+              <td>POO</td>
               <td>Aula 104 (Piso 1)</td>
-              <td>Pérez, J.</td>
+              <td>Molina, J.</td>
             </tr>
             <tr>
               <td>10:00 - 12:00</td>
               <td>Bases de Datos I</td>
               <td>Aula 201 (Piso 2)</td>
-              <td>Gómez, M.</td>
+              <td>Funes, J.</td>
             </tr>
           </tbody>
         </table>
@@ -80,18 +115,48 @@
 
     <!-- Botón Flotante del Chatbot -->
     <div v-show="!isChatOpen" class="chatbot-fab" @click="toggleChat">
-      💬 Consultas
+      Consultas
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 
-// Estado reactivo: arranca en 'false' para que la ventana esté oculta al principio
+const noticias = ref([
+  { id: 1, titulo: 'noticia 1' },
+  { id: 2, titulo: 'noticia 2' },
+  { id: 3, titulo: 'noticia 3' }
+])
+
+const indiceActual = ref(0)
+let intervaloCarrusel
+
+onMounted(() => {
+  intervaloCarrusel = setInterval(() => {
+    // Incrementa el índice y vuelve a 0 cuando llega al final del arreglo
+    indiceActual.value = (indiceActual.value + 1) % noticias.value.length
+  }, 5000)
+})
+
+onUnmounted(() => {
+  clearInterval(intervaloCarrusel)
+})
+
+const filtros = ref({
+  responsable: '',
+  propuesta: '',
+  periodo: '',
+  actividad: '',
+  ubicacion: '',
+  dia: '',
+  turno: ''
+})
+
+// Mantiene el estado de la ventana del chat para q no se vea
 const isChatOpen = ref(false)
 
-// Función que invierte el estado de la ventana al hacer clic
+// Invierte el estado de la ventana
 const toggleChat = () => {
   isChatOpen.value = !isChatOpen.value
 }
@@ -106,6 +171,20 @@ const toggleChat = () => {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   display: flex;
   flex-direction: column;
+}
+
+.logo {
+  display: flex;
+  justify-content: center; /* Centra la imagen horizontalmente */
+  margin-bottom: 1rem;
+}
+
+.logo img {
+  width: 100%;       /* Ocupa el ancho máximo permitido por su contenedor*/
+  max-width: 250px;  /* no pasará de los 250px para no quedar gigante */
+  height: auto;      /* Mantiene la proporción original sin deformarse */
+  object-fit: contain; /* Asegura que la imagen encaje perfectamente */
+  right: 1rem; /* Espacio a la derecha para separar del título */
 }
 
 .header {
@@ -183,6 +262,103 @@ const toggleChat = () => {
 }
 
 .schedule-table tbody tr:hover { background-color: #f9f9f9; }
+
+/*FILTROS*/
+
+.filtros-container {
+  background-color: #ffffff;
+  border-radius: 4px;
+  overflow: hidden;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #000000;
+  margin-bottom: 2rem;
+}
+
+.filtros-header {
+  background-color: #007bb5; /* Azul institucional */
+  color: white;
+  padding: 0.8rem 1rem;
+  font-weight: bold;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.icon-up {
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.filtros-body {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.form-row label {
+  font-size: 0.9rem;
+}
+
+.form-row-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.grid-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.dark-select, .dark-input {
+  background-color: #007bb5;
+  border: 1px solid #060606;
+  color: #fff;
+  padding: 0.6rem;
+  border-radius: 4px;
+  width: 100%;
+  outline: none;
+}
+
+.dark-select:focus, .dark-input:focus {
+  border-color: #007bb5;
+}
+
+/* Input con botón de limpiar */
+.input-with-clear {
+  display: flex;
+  background-color: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.input-with-clear .dark-input {
+  border: none;
+  flex: 1;
+}
+
+.btn-clear {
+  background: none;
+  border: none;
+  color: #fff;
+  padding: 0 1rem;
+  cursor: pointer;
+  background-color: #333;
+}
+
+.btn-clear:hover {
+  background-color: #000000;
+}
 
 /* --- BOTÓN FLOTANTE (FAB) --- */
 .chatbot-fab {
@@ -290,4 +466,35 @@ const toggleChat = () => {
 }
 
 .send-btn:hover { background-color: #e6c200; }
+
+.carrusel-section {
+  background-color: #00A8E8;
+  color: white;
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 2rem;
+}
+
+.slide-noticia h2 {
+  font-size: 2.5rem;
+  margin: 0;
+}
+
+/* Clases de transición de Vue */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.5s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+
+
 </style>
