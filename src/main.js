@@ -11,3 +11,5 @@ app.mount('#app')
 
 const cors = require('cors');
 app.use(cors()); // para conectar el back al frontend
+
+

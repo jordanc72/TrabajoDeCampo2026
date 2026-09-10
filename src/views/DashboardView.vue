@@ -77,21 +77,25 @@
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td>1</td>
-                <td>Fecha de inscripción </td>
-                <td>21/08/2026</td>
-                <td><span class="badge active">Activo</span></td>
-                <td><button class="btn-sm delete">Borrar</button></td>
+              <tr v-for="aviso in listaAvisos" :key="aviso.id_aviso">
+                <td>{{ aviso.id_aviso }}</td>
+                <td>{{ aviso.titulo }}</td>
+                
+                <!-- Formateamos la fecha para que no se vea el "T11:00:00.000Z" -->
+                <td>{{ new Date(aviso.fecha_publicacion).toLocaleDateString('es-AR') }}</td>
+                
+                <td>
+                  <!-- Aplicamos color dinámico según el estado que venga de la base de datos -->
+                  <span class="badge" :class="aviso.estado === 'ACTIVO' ? 'active' : 'inactive'">
+                    {{ aviso.estado }}
+                  </span>
+                </td>
+                
+                <td>
+                  <button class="btn-sm delete">Borrar</button>
+                </td>
               </tr>
-              <tr>
-                <td>2</td>
-                <td>Paro no docente</td>
-                <td>20/08/2026</td>
-                <td><span class="badge inactive">Inactivo</span></td>
-                <td><button class="btn-sm delete">Borrar</button></td>
-              </tr>
-            </tbody>
+          </tbody>
           </table>
         </div>
 
@@ -131,7 +135,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 
@@ -141,11 +145,31 @@ const totalAvisos = ref(0)
 // Para q arranque por defecto en la pestaña 'ver-avisos'
 const vistaActual = ref('ver-avisos') 
 
+/*
 const simularCreacion = () => {
   alert('El mensaje fue "creado" correctamente.')
   vistaActual.value = 'ver-avisos' 
 }
+*/
 
+const listaAvisos = ref([])
+
+// 2. Función para traer los datos desde el túnel de tu compañero
+const obtenerAvisos = async () => {
+  try {
+    
+    const respuesta = await fetch(`${import.meta.env.VITE_API_URL}/avisos`)
+    const datos = await respuesta.json()
+    listaAvisos.value = datos
+    totalAvisos.value = datos.length
+  } catch (error) {
+    console.error("Error conectando al backend:", error)
+  }
+}
+
+// 3. Ejecutamos la función al cargar la pantalla
+onMounted(() => {
+  obtenerAvisos()
 const formularioAviso = ref({ titulo: '', contenido: '' })
 
 
@@ -297,6 +321,19 @@ const logout = () => {
   border-radius: 20px;
   font-size: 0.85rem;
   font-weight: bold;
+}
+.badge.active {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.badge.inactive {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+.badge.BORRADOR {
+  background-color: #e2e3e5;
+  color: #383d41;
 }
 
 .btn-sm.delete {
