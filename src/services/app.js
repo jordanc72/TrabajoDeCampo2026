@@ -1,13 +1,54 @@
-// src/services/api.js
-import axios from 'axios';
+import axios from 'axios'
 
-// Instancia de Axios con la URL base de tu backend
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
-  timeout: 10000, // Si el backend tarda más de 10 sg corta la petición
+  baseURL: import.meta.env.VITE_API_URL || 'https://api.avisosunpaz.com.ar',
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json'
   }
-});
+})
 
-export default api;
+export const getAuthToken = () => localStorage.getItem('token')
+
+export const setAuthSession = ({ token, rol }) => {
+  if (token) localStorage.setItem('token', token)
+  if (rol) localStorage.setItem('rol', rol)
+}
+
+export const clearAuthSession = () => {
+  localStorage.removeItem('token')
+  localStorage.removeItem('rol')
+}
+
+api.interceptors.request.use((config) => {
+  const token = getAuthToken()
+
+  if (token) {
+    config.headers = {
+      ...config.headers,
+      Authorization: `Bearer ${token}`
+    }
+  }
+
+  return config
+})
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error.response?.status
+
+    if (status === 401) {
+      clearAuthSession()
+
+      const currentPath = window.location.pathname
+      if (currentPath !== '/login') {
+        window.location.href = '/login'
+      }
+    }
+
+    return Promise.reject(error)
+  }
+)
+
+export default api

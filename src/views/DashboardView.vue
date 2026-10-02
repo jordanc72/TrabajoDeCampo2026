@@ -1,10 +1,10 @@
 <template>
   <div class="dashboard-layout">
     <!-- Barra Lateral (Sidebar) -->
-    <aside class="sidebar">
+    <!-- Barra Lateral (Sidebar) -->
+    <aside class="sidebar" :class="{ 'sidebar-abierta': menuAbierto }">
       <div class="sidebar-header">
         <span class="logo"><img src="../assets/unpaz.png" alt="Logo Universidad" /></span>
-        
       </div>
       <nav class="sidebar-nav">
         <ul>
@@ -20,7 +20,6 @@
         <button @click="logout" class="btn-logout">Cerrar Sesión</button>
       </div>
     </aside>
-
     <!-- Contenido Principal -->
     <main class="dashboard-content">
       <header class="content-header">
@@ -38,7 +37,7 @@
           
           <div class="stats-grid">
             <div class="stat-card">
-              <span class="stat-title">Avisos Activos</span>
+              <span class="stat-title">Avisos Activos: </span>
               <span class="stat-value">{{ totalAvisos }}</span>
             </div>
             <!-- Podés agregar más tarjetas acá en el futuro para aulas, materias, etc. -->
@@ -63,40 +62,62 @@
 
         <!-- MOCKUP: VER AVISOS -->
         <div v-else-if="vistaActual === 'ver-avisos'" class="card-placeholder fade-in">
-          <h3>Lista de Mensajes</h3>
-          <p>Avisos que se están mostrando actualmente </p>
-          
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Título</th>
-                <th>Fecha</th>
-                <th>Estado</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="aviso in listaAvisos" :key="aviso.id_aviso">
-                <td>{{ aviso.id_aviso }}</td>
-                <td>{{ aviso.titulo }}</td>
-                
-                <!-- Formateamos la fecha para que no se vea el "T11:00:00.000Z" -->
-                <td>{{ new Date(aviso.fecha_publicacion).toLocaleDateString('es-AR') }}</td>
-                
-                <td>
-                  <!-- Aplicamos color dinámico según el estado que venga de la base de datos -->
-                  <span class="badge" :class="aviso.estado === 'ACTIVO' ? 'active' : 'inactive'">
-                    {{ aviso.estado }}
-                  </span>
-                </td>
-                
-                <td>
-                  <button class="btn-sm delete">Borrar</button>
-                </td>
-              </tr>
-          </tbody>
-          </table>
+          <h3>Lista de avisos</h3>
+          <p>Avisos que se están mostrando actualmente</p>
+
+          <div v-if="isLoading" class="table-loading">Cargando avisos...</div>
+
+          <div v-else>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Título</th>
+                  <th>Fecha</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="aviso in listaAvisos" :key="aviso.id_aviso">
+                  <td>{{ aviso.id_aviso }}</td>
+                  <td>{{ aviso.titulo }}</td>
+                  <td>{{ new Date(aviso.fecha_publicacion).toLocaleDateString('es-AR') }}</td>
+                  <td>
+                    <span class="badge" :class="aviso.estado === 'ACTIVO' ? 'active' : aviso.estado === 'BORRADOR' ? 'draft' : 'inactive'">
+                      {{ aviso.estado }}
+                    </span>
+                  </td>
+                  <td>
+                    <div class="table-actions">
+                      <button class="btn-sm edit" @click="iniciarEdicion(aviso)">Editar</button>
+                      <button class="btn-sm delete" @click="eliminarAviso(aviso.id_aviso)">Borrar</button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div v-if="avisoEditandoId !== null" class="edit-panel">
+              <h4>Editar aviso</h4>
+              <form @submit.prevent="guardarEdicionAviso" class="form-crear">
+                <div class="input-group">
+                  <label for="titulo-editar">Título del Aviso</label>
+                  <input id="titulo-editar" v-model="formularioEdicion.titulo" type="text" placeholder="Ej: Cambio de aula para ...." required>
+                </div>
+
+                <div class="input-group">
+                  <label for="contenido-editar">Contenido / Detalles</label>
+                  <textarea id="contenido-editar" v-model="formularioEdicion.contenido" rows="4" placeholder="Cuerpo del mensaje..." required></textarea>
+                </div>
+
+                <div class="form-actions">
+                  <button type="submit" class="btn-primary">Guardar cambios</button>
+                  <button type="button" class="btn-secondary" @click="cancelarEdicion">Cancelar</button>
+                </div>
+              </form>
+            </div>
+          </div>
         </div>
 
         <!-- MOCKUP: CREAR AVISO -->
@@ -104,18 +125,40 @@
           <h3>Crear Nuevo Mensaje</h3>
           <p>Escriba un nuevo aviso para publicarlo en las pantallas de la uni</p>
           
-          <form @submit.prevent="simularCreacion" class="form-crear">
-                        
+          <form @submit.prevent="crearAviso" class="form-crear">
+            
             <div class="input-group">
               <label for="titulo">Título del Aviso</label>
               <input type="text" id="titulo" v-model="formularioAviso.titulo" placeholder="Ej: Cambio de aula para ...." required>
             </div>
 
             <div class="input-group">
-              <label for="contenido">Contenido / Detalles</label>
-              <textarea id="contenido" rows="4" v-model="formularioAviso.contenido" placeholder="Cuerpo del mensaje..." required></textarea>
+              <label for="edificio">Edificio al que pertenece</label>
+              <select id="edificio" v-model="formularioAviso.id_edificio" class="dark-select">
+                <option value="">-- Todos los edificios --</option>
+                <option :value="1">Sede Alem (Central)</option>
+                <option :value="2">Sede Pueyrredón (CEM)</option>
+                <option :value="3">Sede Arregui (Medicina)</option>
+              </select>
             </div>
-            
+            <div class="input-group">
+              <label for="contenido">Contenido / Detalles</label>
+              <textarea id="contenido" rows="4" v-model="formularioAviso.contenido" placeholder="Cuerpo del mensaje (máx 100 caracteres)..." maxlength="100" required></textarea>
+              <small style="text-align: right; color: #666; font-weight: bold;">
+                {{ formularioAviso.contenido.length }} / 100
+              </small>
+            </div>
+            <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+              <div class="input-group" style="flex: 1;">
+                <label for="fecha_desde">Mostrar desde:</label>
+                <input type="datetime-local" id="fecha_desde" v-model="formularioAviso.fechaDesde" required>
+              </div>
+
+              <div class="input-group" style="flex: 1;">
+                <label for="fecha_hasta">Ocultar el:</label>
+                <input type="datetime-local" id="fecha_hasta" v-model="formularioAviso.fechaHasta" required>
+              </div>
+            </div>
             <button type="submit" class="btn-primary">Publicar Mensaje</button>
           </form>
           <div class="preview-container">
@@ -123,7 +166,7 @@
           <h4>Vista Previa del aviso</h4>
           <div class="totem-mockup">
             <!-- Si el input está vacío se muestra esto por defecto -->
-            <h2>{{ formularioAviso.titulo || 'noticia 1' }}</h2>
+            <h2>{{ formularioAviso.titulo || 'Titulo' }}</h2>
             <p>{{ formularioAviso.contenido || 'Sin contenido' }}</p>
           </div>
         </div>
@@ -137,45 +180,140 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-
+import api, { clearAuthSession } from '../services/app.js'
 
 const router = useRouter()
 const totalAvisos = ref(0)
-
-// Para q arranque por defecto en la pestaña 'ver-avisos'
-const vistaActual = ref('ver-avisos') 
-
-/*
-const simularCreacion = () => {
-  alert('El mensaje fue "creado" correctamente.')
-  vistaActual.value = 'ver-avisos' 
-}
-*/
-
+const vistaActual = ref('ver-avisos')
 const listaAvisos = ref([])
+const formularioAviso = ref({ titulo: '', contenido: '' })
+const formularioEdicion = ref({ titulo: '', contenido: '' })
+const avisoEditandoId = ref(null)
+const isLoading = ref(false)
 
-// 2. Función para traer los datos desde el túnel de tu compañero
 const obtenerAvisos = async () => {
+  isLoading.value = true
+
   try {
-    
-    const respuesta = await fetch(`${import.meta.env.VITE_API_URL}/avisos`)
-    const datos = await respuesta.json()
-    listaAvisos.value = datos
-    totalAvisos.value = datos.length
+    const { data } = await api.get('/avisos')
+    const avisos = Array.isArray(data) ? data : []
+    listaAvisos.value = avisos
+    totalAvisos.value = avisos.length
   } catch (error) {
-    console.error("Error conectando al backend:", error)
+    console.error('Error al cargar avisos:', error)
+    alert('No se pudieron cargar los avisos. Intentá nuevamente.')
+  } finally {
+    isLoading.value = false
   }
 }
 
-// 3. Ejecutamos la función al cargar la pantalla
-onMounted(() => {
-  obtenerAvisos()
-const formularioAviso = ref({ titulo: '', contenido: '' })
+const crearAviso = async () => {
+  if (!formularioAviso.value.titulo.trim() || !formularioAviso.value.contenido.trim()) {
+    alert('Completá título y contenido antes de publicar.')
+    return
+  }
 
+  try {
+    const fechaPub = formularioAviso.value.fechaDesde.replace('T', ' ') + ':00';
+    const fechaVenc = formularioAviso.value.fechaHasta.replace('T', ' ') + ':00';
+
+    const arregloEdificios = formularioAviso.value.id_edificio 
+      ? [Number(formularioAviso.value.id_edificio)] 
+      : [];
+
+    const nuevoAviso = {
+      titulo: formularioAviso.value.titulo.trim(),
+      descripcion: formularioAviso.value.contenido.trim(),
+      fecha_publicacion: fechaPub,
+      fecha_vencimiento: fechaVenc,
+      id_categoria: 1,
+      edificios: arregloEdificios,
+      carreras: []
+    }
+    await api.post('/avisos', nuevoAviso)
+
+    alert('¡Aviso publicado correctamente!')
+    formularioAviso.value = { titulo: '', contenido: '', id_edificio: '', fechaDesde: '', fechaHasta: '' }
+    
+    await obtenerAvisos()
+    vistaActual.value = 'ver-avisos'
+  } catch (error) {
+    const mensaje = error.response?.data?.mensaje || error.response?.data?.message || 'No se pudo publicar el aviso.'
+    alert(mensaje)
+  }
+}
+
+const iniciarEdicion = (aviso) => {
+  avisoEditandoId.value = aviso.id_aviso
+  formularioEdicion.value = {
+    titulo: aviso.titulo || '',
+    contenido: aviso.descripcion || aviso.contenido || ''
+  }
+}
+
+const cancelarEdicion = () => {
+  avisoEditandoId.value = null
+  formularioEdicion.value = { titulo: '', contenido: '' }
+}
+
+const guardarEdicionAviso = async () => {
+  if (!avisoEditandoId.value) return
+
+  if (!formularioEdicion.value.titulo.trim() || !formularioEdicion.value.contenido.trim()) {
+    alert('Completá título y contenido antes de guardar los cambios.')
+    return
+  }
+
+  try {
+    const fechaActual = new Date().toISOString().slice(0, 19).replace('T', ' ')
+    const fechaVencimiento = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 19)
+      .replace('T', ' ')
+
+    const avisoActualizado = {
+      titulo: formularioEdicion.value.titulo.trim(),
+      descripcion: formularioEdicion.value.contenido.trim(),
+      fecha_publicacion: fechaActual,
+      fecha_vencimiento: fechaVencimiento,
+      id_categoria: 1,
+      edificios: [],
+      carreras: []
+    }
+
+    await api.put(`/avisos/${avisoEditandoId.value}`, avisoActualizado)
+
+    alert('Aviso actualizado correctamente.')
+    cancelarEdicion()
+    await obtenerAvisos()
+  } catch (error) {
+    const mensaje = error.response?.data?.mensaje || error.response?.data?.message || 'No se pudo editar el aviso.'
+    alert(mensaje)
+  }
+}
+
+const eliminarAviso = async (id) => {
+  const confirmado = confirm('¿Estás seguro de eliminar este aviso definitivamente?')
+  if (!confirmado) return
+
+  try {
+    await api.delete(`/avisos/${id}`)
+    alert('Aviso eliminado correctamente.')
+    await obtenerAvisos()
+  } catch (error) {
+    const mensaje = error.response?.data?.mensaje || error.response?.data?.message || 'Error al intentar eliminar el aviso.'
+    alert(mensaje)
+  }
+}
 
 const logout = () => {
+  clearAuthSession()
   router.push('/login')
 }
+
+onMounted(() => {
+  obtenerAvisos()
+})
 </script>
 
 <style scoped>
@@ -316,6 +454,12 @@ const logout = () => {
   font-weight: bold;
 }
 
+.table-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
 .badge {
   padding: 0.4rem 0.8rem;
   border-radius: 20px;
@@ -334,6 +478,20 @@ const logout = () => {
 .badge.BORRADOR {
   background-color: #e2e3e5;
   color: #383d41;
+}
+
+.btn-sm.edit {
+  background-color: #2563eb;
+  color: white;
+  border: 1px solid #2563eb;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-sm.edit:hover {
+  background-color: #1d4ed8;
 }
 
 .btn-sm.delete {
@@ -391,6 +549,39 @@ const logout = () => {
   max-width: 600px;
 }
 */
+.edit-panel {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: #f8fbff;
+}
+
+.edit-panel h4 {
+  margin: 0 0 1rem;
+  color: #0f172a;
+}
+
+.form-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.btn-secondary {
+  border: 1px solid #cbd5e1;
+  background: white;
+  color: #0f172a;
+  padding: 0.8rem 1.2rem;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background: #f8fafc;
+}
+
 .input-group {
   display: flex;
   flex-direction: column;

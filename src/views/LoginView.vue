@@ -6,36 +6,67 @@
         <h2>Login</h2>
       </div>
       
-      <form @submit.prevent="handleLogin" class="login-form">
-        <div class="input-group">
-          <label for="email">Correo Electrónico</label>
-          <input type="email" id="email" v-model="email" placeholder="admin@universidad.edu.ar" required>
+        <form @submit.prevent="login" class="login-form">
+          <div class="input-group">
+            <label for="email">Correo Electrónico</label>
+            <input type="email" id="email" v-model="email" placeholder="admin@universidad.edu.ar" required>
+          </div>
+          
+          <div class="input-group">
+            <label for="password">Contraseña</label>
+            <input type="password" id="password" v-model="password" placeholder="••••••••" required>
+          </div>
+          
+          <button type="submit" class="btn-login" :disabled="isLoading">
+            {{ isLoading ? 'Ingresando...' : 'Ingresar al Sistema' }}
+          </button>
+        </form>
+        <div class="extra-links">
+          <router-link to="/registrar">¿No tienes cuenta? Regístrese acá</router-link>
         </div>
-        
-        <div class="input-group">
-          <label for="password">Contraseña</label>
-          <input type="password" id="password" v-model="password" placeholder="••••••••" required>
-        </div>
-        
-        <button type="submit" class="btn-login">Ingresar al Sistema</button>
-      </form>
-    </div>
   </div>
+</div>
 </template>
-
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import api, { setAuthSession } from '../services/app.js'
 
 const email = ref('')
 const password = ref('')
+const isLoading = ref(false)
 const router = useRouter()
 
-const handleLogin = () => {
-  // Acá en el futuro irá la llamada a tu API Node.js para validar credenciales.
-  // Por ahora, simulamos que el login es exitoso y enviamos al usuario al Dashboard:
-  console.log('Intentando loguear con:', email.value)
-  router.push('/dashboard') 
+const login = async () => {
+  if (!email.value || !password.value) {
+    alert('Completá correo y contraseña antes de continuar.')
+    return
+  }
+
+  isLoading.value = true
+
+  try {
+    const { data } = await api.post('/login', {
+      usuario: email.value,
+      password: password.value
+    })
+
+    if (!data?.token) {
+      throw new Error('No se recibió un token válido del servidor.')
+    }
+
+    setAuthSession({
+      token: data.token,
+      rol: data.rol
+    })
+
+    router.push('/dashboard')
+  } catch (error) {
+    const mensaje = error.response?.data?.message || error.response?.data?.mensaje || error.message || 'Error al intentar loguear. Por favor, inténtelo de nuevo.'
+    alert(mensaje)
+  } finally {
+    isLoading.value = false
+  }
 }
 </script>
 
@@ -127,5 +158,21 @@ const handleLogin = () => {
 
 .btn-login:hover {
   background-color: #008fca;
+}
+
+.extra-links {
+  margin-top: 1.5rem;
+  text-align: center;
+}
+
+.extra-links a {
+  color: #1b365d;
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.extra-links a:hover {
+  text-decoration: underline;
 }
 </style>
