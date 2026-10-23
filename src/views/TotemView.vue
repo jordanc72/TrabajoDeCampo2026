@@ -1,25 +1,26 @@
 <template>
   <div class="totem-container">
-    <!-- Encabezado -->
+    <!-- Encabezado con Carrusel Lateral Integrado -->
     <header class="header">
-      <div class="logo"><img src="../assets/unpaz.png" alt="Logo Universidad" /></div>
+      <div class="logo">
+        <img src="../assets/unpaz.png" alt="Logo Universidad" />
+      </div>
+      
+      <!-- Cinta de noticias (Marquee) -->
+      <div v-if="noticias.length > 0" class="ticker-wrapper">
+        <div class="ticker-track">
+          <span v-for="(noticia, index) in noticias" :key="index" class="ticker-item">
+            <span class="ticker-title">{{ noticia.titulo }}</span>: {{ noticia.descripcion }}
+            <span class="ticker-separator"> | </span>
+          </span>
+        </div>
+      </div>
     </header>
 
     <!-- Contenido Principal -->
     <main class="main-content">
-      
-      <!-- Carrusel de Noticias -->
-      <section class="carrusel-section">
-        <transition name="fade" mode="out-in">
-          <div v-if="noticias.length > 0" :key="indiceActual" class="slide-noticia">
-            <h2>{{ noticias[indiceActual].titulo }}</h2>
-            <p>{{ noticias[indiceActual].descripcion }}</p>
-          </div>
-        </transition>
-      </section>
-
       <!-- Título de Cursadas -->
-      <h2 style="color: #0A192F; border-bottom: 3px solid #FFD700; padding-bottom: 0.5rem; margin-top: 1rem;">
+      <h2 style="color: #0A192F; border-bottom: 3px solid #FFD700; padding-bottom: 0.5rem; margin-top: 0;">
         Cronograma de Cursadas
       </h2>
 
@@ -30,24 +31,34 @@
           <div class="col">Día</div>
           <div class="col">Horario</div>
           <div class="col">Materia</div>
-          <div class="col">Comisión</div>
+          <div class="col">Com.</div>
+          <div class="col">Modalidad</div>
+          <div class="col">Frecuencia</div>
           <div class="col">Aula</div>
         </div>
         
-        <!-- Cuerpo animado (Ascienden y se desvanecen) -->
+        <!-- Movimiento de materias -->
         <transition-group name="scroll" tag="div" class="schedule-body">
           <div v-for="materia in horariosVisibles" :key="materia.uniqueId" class="schedule-row">
-            <div class="col font-bold">{{ materia.Dia }}</div>
-            <div class="col">{{ materia['Hora Inicio'].slice(0,5) }} - {{ materia['Hora Fin'].slice(0,5) }}</div>
-            <div class="col">{{ materia['Nombre de la Materia'] }}</div>
-            <div class="col text-center">{{ materia['Nombre de la Comision'] }}</div>
-            <div class="col text-center badge-aula">{{ materia.Aula || 'A designar' }}</div>
+            <div class="col font-bold">{{ materia.dia }}</div>
+            <div class="col text-center">
+              {{ materia.hora_inicio ? materia.hora_inicio.slice(0,5) : '' }} - 
+              {{ materia.hora_fin ? materia.hora_fin.slice(0,5) : '' }}
+            </div>
+            <div class="col font-bold materia-texto">{{ materia.nombre }}</div>
+            <div class="col text-center">{{ materia.comision }}</div>
+            <div class="col text-center">
+              <span class="modalidad-principal">{{ materia.modalidad }}</span><br>
+              <span class="modalidad-combo">{{ materia.modalidad_combo }}</span>
+            </div>
+            <div class="col text-center badge-frecuencia">{{ materia.periodicidad }}</div>
+            <div class="col text-center badge-aula">{{ materia.aula || 'A designar' }}</div>
           </div>
         </transition-group>
       </section>
     </main>
 
-    <!-- Ventana Desplegable del Chatbot -->
+    <!-- Ventana y Botón del Chatbot -->
     <div v-show="isChatOpen" class="chatbot-window">
       <div class="chat-header">
         <h3>Asistente Institucional</h3>
@@ -63,8 +74,6 @@
         <button class="send-btn">➤</button>
       </div>
     </div>
-
-    <!-- Botón Flotante del Chatbot -->
     <div v-show="!isChatOpen" class="chatbot-fab" @click="toggleChat">
       Consultas
     </div>
@@ -75,144 +84,89 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import api from '../services/app.js'
 
-// ==========================================
-// 1. LÓGICA DE NOTICIAS (AVISOS)
-// ==========================================
+// --- 1. AVISOS ---
 const noticias = ref([])
-const indiceActual = ref(0)
-let intervaloCarrusel
 
 const cargarNoticias = async () => {
   try {
     const { data } = await api.get('/avisos')
     const ahoraMs = new Date().getTime() 
-       
-    const avisosActivos = data.filter(aviso => {
-      const fechaPubString = aviso.fecha_publicacion.replace('T', ' ').slice(0, 19).replace(/-/g, '/')
-      const fechaVencString = aviso.fecha_vencimiento.replace('T', ' ').slice(0, 19).replace(/-/g, '/')
-      
-      const pubMs = new Date(fechaPubString).getTime()
-      const vencMs = new Date(fechaVencString).getTime()
-      
-      return aviso.estado === 'ACTIVO' && ahoraMs >= pubMs && ahoraMs <= vencMs
-    })
     
-    noticias.value = avisosActivos.length > 0 
-      ? avisosActivos 
-      : [{ id_aviso: 0, titulo: 'No hay avisos recientes', descripcion: 'Consultá más tarde para novedades.' }]
-      
+    const avisosActivos = data.filter(aviso => {
+      const pubMs = new Date(aviso.fecha_publicacion).getTime()
+      const vencMs = new Date(aviso.fecha_vencimiento).getTime()
+      return ahoraMs >= pubMs && ahoraMs <= vencMs
+    })
+    noticias.value = avisosActivos
   } catch (error) {
     console.error('Error al cargar noticias en el totem:', error)
-    noticias.value = [{ id_aviso: 0, titulo: 'Error al conectar con el servidor', descripcion: '' }]
+    noticias.value = []
   }
 }
 
-// ==========================================
-// 2. LÓGICA DE HORARIOS (EXCEL ANIMADO)
-// ==========================================
-// Datos extraídos directamente de tu archivo Trabajo_de_campo.xlsx
-const horariosBase = [
-  {"Dia": "Martes", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Laboratorio de Software", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Lunes", "Hora Inicio": "13:00:00", "Hora Fin": "17:00:00", "Nombre de la Materia": "Ingeniería de Software I", "Nombre de la Comision": "B1", "Aula": ""},
-  {"Dia": "Viernes", "Hora Inicio": "14:00:00", "Hora Fin": "18:00:00", "Nombre de la Materia": "Algoritmos y Programación", "Nombre de la Comision": "B1", "Aula": ""},
-  {"Dia": "Jueves", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Base de Datos II", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Martes", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Sistemas Operativos II", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Sabado", "Hora Inicio": "08:00:00", "Hora Fin": "12:00:00", "Nombre de la Materia": "Gestión de Proyectos", "Nombre de la Comision": "A1", "Aula": ""},
-  {"Dia": "Lunes", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Inglés II", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Miercoles", "Hora Inicio": "14:00:00", "Hora Fin": "18:00:00", "Nombre de la Materia": "Análisis Matemático II", "Nombre de la Comision": "B1", "Aula": ""},
-  {"Dia": "Viernes", "Hora Inicio": "08:00:00", "Hora Fin": "12:00:00", "Nombre de la Materia": "Álgebra y Geometría Analítica", "Nombre de la Comision": "A1", "Aula": ""},
-  {"Dia": "Lunes", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Base de Datos I", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Miercoles", "Hora Inicio": "13:00:00", "Hora Fin": "17:00:00", "Nombre de la Materia": "Base de Datos I", "Nombre de la Comision": "B1", "Aula": ""},
-  {"Dia": "Martes", "Hora Inicio": "08:00:00", "Hora Fin": "12:00:00", "Nombre de la Materia": "Estructuras Discretas", "Nombre de la Comision": "A1", "Aula": ""},
-  {"Dia": "Jueves", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Arquitectura de Computadoras II", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Miercoles", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Álgebra y Geometría Analítica", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Lunes", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Dirección Estratégica", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Viernes", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Contabilidad I", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Viernes", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Comunicaciones y Redes", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Lunes", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Administración II", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Miercoles", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Ingeniería de Software II", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Martes", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Análisis Matemático II", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Miercoles", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Optativa II", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Sabado", "Hora Inicio": "08:00:00", "Hora Fin": "12:00:00", "Nombre de la Materia": "Administración II", "Nombre de la Comision": "A1", "Aula": ""},
-  {"Dia": "Martes", "Hora Inicio": "14:00:00", "Hora Fin": "18:00:00", "Nombre de la Materia": "Análisis Matemático I", "Nombre de la Comision": "B1", "Aula": ""},
-  {"Dia": "Martes", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Inteligencia de los Negocios", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Miercoles", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Ciencia, Tecnología y Sociedad", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Jueves", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Arquitectura de Computadoras I", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Martes", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Administración de Recursos Humanos", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Jueves", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Trabajo Final de Grado", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Jueves", "Hora Inicio": "14:00:00", "Hora Fin": "18:00:00", "Nombre de la Materia": "Álgebra y Geometría Analítica", "Nombre de la Comision": "B1", "Aula": ""},
-  {"Dia": "Martes", "Hora Inicio": "08:00:00", "Hora Fin": "12:00:00", "Nombre de la Materia": "Arquitectura de Computadoras II", "Nombre de la Comision": "A1", "Aula": ""},
-  {"Dia": "Jueves", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Programación Orientada a Objetos", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Jueves", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Contabilidad Avanzada", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Martes", "Hora Inicio": "14:00:00", "Hora Fin": "18:00:00", "Nombre de la Materia": "Arquitectura de Computadoras II", "Nombre de la Comision": "B1", "Aula": ""},
-  {"Dia": "Viernes", "Hora Inicio": "08:00:00", "Hora Fin": "12:00:00", "Nombre de la Materia": "Ciencia, Tecnología y Sociedad", "Nombre de la Comision": "A1", "Aula": ""},
-  {"Dia": "Miercoles", "Hora Inicio": "08:00:00", "Hora Fin": "12:00:00", "Nombre de la Materia": "Análisis Matemático I", "Nombre de la Comision": "A1", "Aula": ""},
-  {"Dia": "Lunes", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Administración I", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Miercoles", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Arquitectura Web", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Lunes", "Hora Inicio": "14:00:00", "Hora Fin": "18:00:00", "Nombre de la Materia": "Estructuras Discretas", "Nombre de la Comision": "B1", "Aula": ""},
-  {"Dia": "Sabado", "Hora Inicio": "08:00:00", "Hora Fin": "12:00:00", "Nombre de la Materia": "Probabilidad y Estadísticas", "Nombre de la Comision": "A1", "Aula": ""},
-  {"Dia": "Viernes", "Hora Inicio": "14:00:00", "Hora Fin": "18:00:00", "Nombre de la Materia": "Ciencia, Tecnología y Sociedad", "Nombre de la Comision": "B1", "Aula": ""},
-  {"Dia": "Lunes", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Seguridad Informática", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Miercoles", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Administración II", "Nombre de la Comision": "C2", "Aula": ""},
-  {"Dia": "Sabado", "Hora Inicio": "08:00:00", "Hora Fin": "12:00:00", "Nombre de la Materia": "Algoritmos y Programación", "Nombre de la Comision": "A1", "Aula": ""},
-  {"Dia": "Martes", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Algoritmos y Programación", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Miercoles", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Trabajo de Campo", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Miercoles", "Hora Inicio": "14:00:00", "Hora Fin": "18:00:00", "Nombre de la Materia": "Introducción a la Programación", "Nombre de la Comision": "B1", "Aula": ""},
-  {"Dia": "Lunes", "Hora Inicio": "08:00:00", "Hora Fin": "12:00:00", "Nombre de la Materia": "Análisis Matemático II", "Nombre de la Comision": "A1", "Aula": ""},
-  {"Dia": "Martes", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Investigación Operativa", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Martes", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Introducción a la Programación", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Martes", "Hora Inicio": "18:00:00", "Hora Fin": "22:00:00", "Nombre de la Materia": "Laboratorio de Programación y Lenguajes", "Nombre de la Comision": "C1", "Aula": ""},
-  {"Dia": "Lunes", "Hora Inicio": "08:00:00", "Hora Fin": "12:00:00", "Nombre de la Materia": "Arquitectura de Computadoras I", "Nombre de la Comision": "A1", "Aula": ""},
-  {"Dia": "Jueves", "Hora Inicio": "08:00:00", "Hora Fin": "12:00:00", "Nombre de la Materia": "Inglés I", "Nombre de la Comision": "A1", "Aula": ""},
-  {"Dia": "Viernes", "Hora Inicio": "14:00:00", "Hora Fin": "18:00:00", "Nombre de la Materia": "Inglés I", "Nombre de la Comision": "B1", "Aula": ""},
-  {"Dia": "Jueves", "Hora Inicio": "08:00:00", "Hora Fin": "12:00:00", "Nombre de la Materia": "Introducción a la Programación", "Nombre de la Comision": "A1", "Aula": ""}
-];
-
-// Cantidad de filas a mostrar a la vez (ideal para un Totem sin que se rompa la pantalla)
-const MAX_FILAS_VISIBLES = 6;
+// --- 2. MATERIAS (HORARIOS) ---
+const MAX_FILAS_VISIBLES = 8;
+let horariosBase = [];
 let indiceMateria = MAX_FILAS_VISIBLES;
 let intervaloHorarios;
+const horariosVisibles = ref([]);
 
-// Inicializamos la lista con las primeras 6 materias y les ponemos un ID único
-const horariosVisibles = ref(
-  horariosBase.slice(0, MAX_FILAS_VISIBLES).map((h, i) => ({ ...h, uniqueId: Date.now() + i }))
-);
+const cargarHorarios = async () => {
+  try {
+    const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
+    const diaHoy = diasSemana[new Date().getDay()]; 
+    
+    const { data } = await api.get('/materias/' + diaHoy);
+    horariosBase = Array.isArray(data) ? data : [];
+    
+    if (horariosBase.length > 0) {
+      horariosVisibles.value = horariosBase
+        .slice(0, MAX_FILAS_VISIBLES)
+        .map((h, i) => ({ ...h, uniqueId: Date.now() + i }));
+      indiceMateria = MAX_FILAS_VISIBLES;
+    } else {
+      horariosVisibles.value = [];
+    }
+  } catch (error) {
+    console.error(`Error al cargar materias de hoy:`, error);
+    horariosVisibles.value = [];
+  }
+}
 
-// ==========================================
-// 3. CHATBOT Y CICLOS DE VIDA
-// ==========================================
+// --- 3. CHATBOT ---
 const isChatOpen = ref(false)
 const toggleChat = () => { isChatOpen.value = !isChatOpen.value }
 
+// --- 4. MOTORES E INICIALIZACIÓN ---
 onMounted(async () => {
-  await cargarNoticias()
+  await Promise.all([cargarNoticias(), cargarHorarios()]);
 
-  // Carrusel de los Avisos
-  if (noticias.value.length > 1) {
-    intervaloCarrusel = setInterval(() => {
-      indiceActual.value = (indiceActual.value + 1) % noticias.value.length
-    }, 5000)
-  }
-
-  // Animación del Cronograma: Cada 3 segundos asciende y se desvanece
+  // Motor del Cronograma (Asciende y desvanece)
   intervaloHorarios = setInterval(() => {
-    // Saca el primer elemento (dispara animación Leave hacia arriba)
-    horariosVisibles.value.shift();
-    
-    // Calcula la próxima materia del Excel
-    const nextItem = horariosBase[indiceMateria % horariosBase.length];
-    
-    // Mete el nuevo elemento al final (dispara animación Enter desde abajo)
-    // El "uniqueId" es clave matemática para que Vue entienda qué fila es nueva
-    horariosVisibles.value.push({ ...nextItem, uniqueId: Date.now() });
-    
-    indiceMateria++;
+    if (horariosBase.length > 0) {
+      horariosVisibles.value.shift();
+      const nextItem = horariosBase[indiceMateria % horariosBase.length];
+      horariosVisibles.value.push({ ...nextItem, uniqueId: Date.now() });
+      indiceMateria++;
+    }
   }, 3500);
+
+  // Auto-recarga silenciosa cada 15 segundos
+  setInterval(async () => {
+    await cargarNoticias();
+    try {
+      const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
+      const diaHoy = diasSemana[new Date().getDay()];
+      const { data } = await api.get('/materias/' + diaHoy);
+      if (Array.isArray(data) && data.length > 0) {
+        horariosBase = data;
+      }
+    } catch (e) {}
+  }, 15000);
 })
 
 onUnmounted(() => {
-  if (intervaloCarrusel) clearInterval(intervaloCarrusel)
-  if (intervaloHorarios) clearInterval(intervaloHorarios)
+  clearInterval(intervaloHorarios)
 })
 </script>
 
@@ -227,41 +181,76 @@ onUnmounted(() => {
   flex-direction: column;
 }
 
-.logo {
-  display: flex;
-  justify-content: center; 
-  margin-bottom: 1rem;
-}
-
-.logo img {
-  width: 100%;       
-  max-width: 250px;  
-  height: auto;      
-  object-fit: contain; 
-  right: 1rem; 
-}
-
+/* --- HEADER Y CINTA DE NOTICIAS --- */
 .header {
   background-color: #0A192F;
   color: #FFFFFF;
-  padding: 1.5rem 2rem;
+  padding: 1.2rem 2rem; 
+  margin: 2rem 2rem 0 2rem; 
+  border-radius: 8px; 
   display: flex;
   align-items: center;
-  gap: 1rem;
   border-bottom: 5px solid #FFD700;
+  overflow: hidden; 
 }
 
+.logo {
+  flex-shrink: 0;
+  margin-right: 2rem;
+  display: flex;
+  justify-content: center;
+}
+
+.logo img {
+  width: 100%;
+  /* Agrandamos el límite del logo (antes 150px) */
+  max-width: 180px; 
+  height: auto;
+  object-fit: contain;
+}
+
+.ticker-wrapper {
+  flex-grow: 1;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.ticker-track {
+  display: inline-block;
+  padding-left: 100%; /* Arranca empujado fuera de la pantalla a la derecha */
+  animation: marquee 25s linear infinite; /* Tiempo de la animación */
+}
+
+.ticker-item {
+  /* Agrandamos la letra significativamente (antes 1.2rem) */
+  font-size: 1.8rem;
+}
+
+.ticker-title {
+  font-weight: bold;
+  color: #FFD700;
+}
+
+.ticker-separator {
+  margin: 0 2.5rem;
+  color: #00A8E8;
+}
+
+@keyframes marquee {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(-100%, 0); }
+}
+
+/* --- CONTENIDO PRINCIPAL --- */
 .main-content {
   flex: 1;
   padding: 2rem;
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.5rem;
   overflow: hidden;
 }
 
-
-/* --- GRILLA DE HORARIOS ANIMADA (CSS GRID) --- */
 .schedule-board {
   background-color: white;
   border-radius: 8px;
@@ -271,92 +260,75 @@ onUnmounted(() => {
 
 .schedule-header {
   display: grid;
-  grid-template-columns: 1fr 1.5fr 3fr 1fr 1fr;
+  grid-template-columns: 0.8fr 1.2fr 2.5fr 0.6fr 1.8fr 1fr 1fr;
   background-color: #00A8E8;
   color: #FFFFFF;
-  padding: 1.2rem 1rem;
-  font-size: 1.1rem;
+  padding: 1.2rem 0.5rem;
+  font-size: 1.05rem;
   font-weight: bold;
-}
-
-/* El cuerpo es relativo para que el 'absolute' de las filas que salen funcione */
-.schedule-body {
-  position: relative;
-  display: flex;
-  flex-direction: column;
+  text-align: center;
 }
 
 .schedule-row {
   display: grid;
-  grid-template-columns: 1fr 1.5fr 3fr 1fr 1fr;
-  padding: 1.2rem 1rem;
+  grid-template-columns: 0.8fr 1.2fr 2.5fr 0.6fr 1.8fr 1fr 1fr;
+  padding: 1rem 0.5rem;
   border-bottom: 1px solid #eee;
   background-color: white;
   align-items: center;
-  font-size: 1.05rem;
+  font-size: 0.95rem;
 }
 
 .schedule-row:nth-child(even) { background-color: #f8fbff; }
-
-.font-bold { font-weight: 600; }
+.font-bold { font-weight: 600; color: #0A192F; }
 .text-center { text-align: center; }
+
+.materia-texto {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 10px;
+}
+
+.modalidad-principal {
+  font-weight: bold;
+  color: #0A192F;
+}
+.modalidad-combo {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.badge-frecuencia {
+  background-color: #f1f5f9;
+  color: #475569;
+  padding: 0.3rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: bold;
+  border: 1px solid #cbd5e1;
+}
+
 .badge-aula {
   background-color: #e0f2fe;
   color: #0369a1;
-  padding: 0.3rem 0.6rem;
+  padding: 0.4rem 0.6rem;
   border-radius: 6px;
   font-weight: bold;
   font-size: 0.9rem;
 }
 
-/* --- CLASES MAGICAS DE TRANSICIÓN VUE --- */
+/* --- CLASES DE TRANSICIÓN VUE --- */
 .scroll-move,
 .scroll-enter-active,
 .scroll-leave-active {
-  /* La curva 'cubic-bezier' le da ese efecto moderno de deslizamiento */
   transition: all 1s cubic-bezier(0.55, 0.055, 0.675, 0.19);
 }
+.scroll-enter-from { opacity: 0; transform: translateY(30px); }
+.scroll-leave-to { opacity: 0; transform: translateY(-30px); }
+.scroll-leave-active { position: absolute; width: 100%; }
 
-.scroll-enter-from {
-  opacity: 0;
-  transform: translateY(30px); /* Entra desde abajo */
-}
-
-.scroll-leave-to {
-  opacity: 0;
-  transform: translateY(-30px); /* Se desvanece hacia arriba */
-}
-
-/* Fundamental: Saca del flujo al elemento que se va para que los de abajo suban de golpe */
-.scroll-leave-active {
-  position: absolute;
-  width: 100%;
-}
-
-
-/* --- CARRUSEL AVISOS --- */
-.carrusel-section {
-  background-color: #00A8E8;
-  color: white;
-  height: 200px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  overflow: hidden;
-  margin-bottom: 1rem;
-}
-
-.slide-noticia { text-align: center; }
-.slide-noticia h2 { font-size: 2.5rem; margin: 0 0 0.5rem 0; }
-.slide-noticia p { font-size: 1.2rem; margin: 0; }
-
-.fade-enter-active,
-.fade-leave-active { transition: opacity 0.5s ease; }
-.fade-enter-from,
-.fade-leave-to { opacity: 0; }
-
-/* --- BOTÓN FLOTANTE (FAB) --- */
+/* --- BOTÓN FLOTANTE Y CHATBOT --- */
 .chatbot-fab {
   position: fixed;
   bottom: 2rem;
@@ -371,10 +343,8 @@ onUnmounted(() => {
   box-shadow: 0 4px 10px rgba(0,0,0,0.2);
   transition: transform 0.2s;
 }
-
 .chatbot-fab:hover { transform: scale(1.05); }
 
-/* --- VENTANA DEL CHATBOT --- */
 .chatbot-window {
   position: fixed;
   bottom: 2rem;
@@ -390,7 +360,6 @@ onUnmounted(() => {
   border: 1px solid #e0e0e0;
   z-index: 1000;
 }
-
 .chat-header {
   background-color: #0A192F;
   color: #FFFFFF;
@@ -400,24 +369,9 @@ onUnmounted(() => {
   align-items: center;
   border-bottom: 3px solid #00A8E8;
 }
-
 .chat-header h3 { margin: 0; font-size: 1.1rem; }
-
-.close-btn {
-  background: none;
-  border: none;
-  color: #FFFFFF;
-  font-size: 1.2rem;
-  cursor: pointer;
-}
-
-.chat-body {
-  flex: 1;
-  padding: 1rem;
-  background-color: #f9f9f9;
-  overflow-y: auto;
-}
-
+.close-btn { background: none; border: none; color: #FFFFFF; font-size: 1.2rem; cursor: pointer; }
+.chat-body { flex: 1; padding: 1rem; background-color: #f9f9f9; overflow-y: auto; }
 .message.bot {
   background-color: #e0f2fe;
   color: #0A192F;
@@ -427,7 +381,6 @@ onUnmounted(() => {
   font-size: 0.95rem;
   line-height: 1.4;
 }
-
 .chat-footer {
   padding: 1rem;
   background-color: #FFFFFF;
@@ -435,17 +388,8 @@ onUnmounted(() => {
   gap: 0.5rem;
   border-top: 1px solid #e0e0e0;
 }
-
-.chat-input {
-  flex: 1;
-  padding: 0.8rem;
-  border: 1px solid #ccc;
-  border-radius: 20px;
-  outline: none;
-}
-
+.chat-input { flex: 1; padding: 0.8rem; border: 1px solid #ccc; border-radius: 20px; outline: none; }
 .chat-input:focus { border-color: #00A8E8; }
-
 .send-btn {
   background-color: #FFD700;
   color: #0A192F;
@@ -460,6 +404,5 @@ onUnmounted(() => {
   align-items: center;
   transition: background-color 0.2s;
 }
-
 .send-btn:hover { background-color: #e6c200; }
 </style>

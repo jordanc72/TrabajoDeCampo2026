@@ -29,7 +29,6 @@
       
       <div class="content-body">
         
-        <!-- PANTALLAS EN CONSTRUCCIÓN (Placeholders) -->
         <!-- PANEL DE INICIO (Estadísticas) -->
         <div v-if="vistaActual === 'inicio'" class="card-placeholder fade-in">
           <h3>Resumen del Sistema</h3>
@@ -40,19 +39,117 @@
               <span class="stat-title">Avisos Activos: </span>
               <span class="stat-value">{{ totalAvisos }}</span>
             </div>
-            <!-- Podés agregar más tarjetas acá en el futuro para aulas, materias, etc. -->
           </div>
         </div>
-
 
         <div v-else-if="vistaActual === 'horarios'" class="card-placeholder fade-in">
           <h3>Gestión de Horarios</h3>
           <p>Módulo para asignar materias a las aulas.</p>
         </div>
 
+        <!-- Modulo de materias -->
         <div v-else-if="vistaActual === 'materias'" class="card-placeholder fade-in">
           <h3>Gestión de Materias</h3>
-          <p>Módulo para materias y carreras.</p>
+          <p>Carga de materias, horarios y aulas que se verán en la pantalla del Totem.</p>
+          
+          <!-- Formulario de Carga -->
+          <form @submit.prevent="crearMateria" class="form-crear" style="margin-bottom: 2rem;">
+            
+            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+              <div class="input-group">
+                <label>Nombre de la Materia</label>
+                <input type="text" v-model="formularioMateria.nombre" placeholder="Ej: Lab. de Software" required>
+              </div>
+              <div class="input-group">
+                <label>Comisión</label>
+                <input type="text" v-model="formularioMateria.comision" placeholder="Ej: C1" required>
+              </div>
+              <div class="input-group">
+                <label>Día</label>
+                <select v-model="formularioMateria.dia" required class="dark-select" style="background-color: white; color: black;">
+                  <option value="">-- Día --</option>
+                  <option>Lunes</option><option>Martes</option><option>Miercoles</option>
+                  <option>Jueves</option><option>Viernes</option><option>Sabado</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+              <div class="input-group">
+                <label>Hora Inicio</label>
+                <input type="time" v-model="formularioMateria.hora_inicio" required>
+              </div>
+              <div class="input-group">
+                <label>Hora Fin</label>
+                <input type="time" v-model="formularioMateria.hora_fin" required>
+              </div>
+              <div class="input-group">
+                <label>Edificio</label>
+                <input type="text" v-model="formularioMateria.edificio" placeholder="Ej: Sede Central">
+              </div>
+              <div class="input-group">
+                <label>Aula</label>
+                <input type="text" v-model="formularioMateria.aula" placeholder="Ej: Aula 102">
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+              <div class="input-group">
+                <label>Modalidad</label>
+                <select v-model="formularioMateria.modalidad" required class="dark-select" style="background-color: white; color: black;">
+                  <option value="">-- Seleccione --</option>
+                  <option>Presencial</option>
+                  <option>A distancia - Presencial</option>
+                  <option>Virtual</option>
+                </select>
+              </div>
+              <div class="input-group">
+                <label>Detalle Modalidad</label>
+                <input type="text" v-model="formularioMateria.modalidad_combo" placeholder="Ej: 100% Presencial">
+              </div>
+              <div class="input-group">
+                <label>Periodicidad</label>
+                <select v-model="formularioMateria.periodicidad" required class="dark-select" style="background-color: white; color: black;">
+                  <option value="">-- Seleccione --</option>
+                  <option>Semanal</option>
+                  <option>Quincenal</option>
+                </select>
+              </div>
+            </div>
+
+            <button type="submit" class="btn-primary">Guardar Materia</button>
+          </form>
+
+          <hr style="border: 1px solid #eee; margin: 2rem 0;">
+
+          <!-- Tabla de Materias Existentes -->
+          <h4>Materias Cargadas ({{ listaMaterias.length }})</h4>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Día</th>
+                <th>Horario</th>
+                <th>Materia</th>
+                <th>Com.</th>
+                <th>Modalidad</th>
+                <th>Aula</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="materia in listaMaterias" :key="materia.id_materia">
+                <td>{{ materia.dia }}</td>
+                <td>{{ materia.hora_inicio ? materia.hora_inicio.slice(0,5) : '' }} a {{ materia.hora_fin ? materia.hora_fin.slice(0,5) : '' }}</td>
+                <td><strong>{{ materia.nombre }}</strong></td>
+                <td>{{ materia.comision }}</td>
+                <td>{{ materia.modalidad }}</td>
+                <td><span class="badge active">{{ materia.aula || 'S/A' }}</span></td>
+                <td>
+                  <button class="btn-sm delete" @click="eliminarMateria(materia.id_materia)">Borrar</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
         <div v-else-if="vistaActual === 'aulas'" class="card-placeholder fade-in">
@@ -68,55 +165,73 @@
           <div v-if="isLoading" class="table-loading">Cargando avisos...</div>
 
           <div v-else>
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Título</th>
-                  <th>Fecha</th>
-                  <th>Estado</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="aviso in listaAvisos" :key="aviso.id_aviso">
-                  <td>{{ aviso.id_aviso }}</td>
-                  <td>{{ aviso.titulo }}</td>
-                  <td>{{ new Date(aviso.fecha_publicacion).toLocaleDateString('es-AR') }}</td>
-                  <td>
-                    <span class="badge" :class="aviso.estado === 'ACTIVO' ? 'active' : aviso.estado === 'BORRADOR' ? 'draft' : 'inactive'">
-                      {{ aviso.estado }}
-                    </span>
-                  </td>
-                  <td>
-                    <div class="table-actions">
-                      <button class="btn-sm edit" @click="iniciarEdicion(aviso)">Editar</button>
-                      <button class="btn-sm delete" @click="eliminarAviso(aviso.id_aviso)">Borrar</button>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            <!-- 1. Hacemos que la cabecera "Fecha" sea un botón para ordenar -->
+<table class="data-table">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Título</th>
+      <th @click="ordenFecha = ordenFecha === 'desc' ? 'asc' : 'desc'" style="cursor: pointer; user-select: none; color: #00A8E8;">
+        Fecha <span v-if="ordenFecha === 'desc'">▼</span><span v-else>▲</span>
+      </th>
+      <th>Estado</th>
+      <th>Acciones</th>
+    </tr>
+  </thead>
+  <tbody>
+    <!-- 2. Cambiamos "listaAvisos" por la nueva variable "avisosOrdenados" -->
+    <tr v-for="aviso in avisosOrdenados" :key="aviso.id_aviso">
+      <td>{{ aviso.id_aviso }}</td>
+      <td>{{ aviso.titulo }}</td>
+      <td>{{ new Date(aviso.fecha_publicacion).toLocaleDateString('es-AR') }}</td>
+      <td>
+        <span :class="{'badge active': calcularEstado(aviso.fecha_publicacion, aviso.fecha_vencimiento) === 'Activo', 'badge inactive': calcularEstado(aviso.fecha_publicacion, aviso.fecha_vencimiento) === 'Vencido', 'badge BORRADOR': calcularEstado(aviso.fecha_publicacion, aviso.fecha_vencimiento) === 'Programado'}">
+          {{ calcularEstado(aviso.fecha_publicacion, aviso.fecha_vencimiento) }}
+        </span>
+      </td>
+      <td>
+        <div class="table-actions">
+          <button class="btn-sm edit" @click="iniciarEdicion(aviso)">Editar</button>
+          <button class="btn-sm delete" @click="eliminarAviso(aviso.id_aviso)">Borrar</button>
+        </div>
+      </td>
+    </tr>
+  </tbody>
+</table>
 
-            <div v-if="avisoEditandoId !== null" class="edit-panel">
-              <h4>Editar aviso</h4>
-              <form @submit.prevent="guardarEdicionAviso" class="form-crear">
-                <div class="input-group">
-                  <label for="titulo-editar">Título del Aviso</label>
-                  <input id="titulo-editar" v-model="formularioEdicion.titulo" type="text" placeholder="Ej: Cambio de aula para ...." required>
-                </div>
+<!-- 3. Agregamos los inputs de fecha al formulario de edición -->
+<div v-if="avisoEditandoId !== null" class="edit-panel">
+  <h4>Editar aviso</h4>
+  <form @submit.prevent="guardarEdicionAviso" class="form-crear">
+    <div class="input-group">
+      <label for="titulo-editar">Título del Aviso</label>
+      <input id="titulo-editar" v-model="formularioEdicion.titulo" type="text" required>
+    </div>
 
-                <div class="input-group">
-                  <label for="contenido-editar">Contenido / Detalles</label>
-                  <textarea id="contenido-editar" v-model="formularioEdicion.contenido" rows="4" placeholder="Cuerpo del mensaje..." required></textarea>
-                </div>
+    <div class="input-group">
+      <label for="contenido-editar">Contenido / Detalles</label>
+      <textarea id="contenido-editar" v-model="formularioEdicion.contenido" rows="4" required></textarea>
+    </div>
 
-                <div class="form-actions">
-                  <button type="submit" class="btn-primary">Guardar cambios</button>
-                  <button type="button" class="btn-secondary" @click="cancelarEdicion">Cancelar</button>
-                </div>
-              </form>
-            </div>
+    <!-- NUEVO: Campos para editar los horarios -->
+    <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+      <div class="input-group" style="flex: 1;">
+        <label for="edit_fecha_desde">Mostrar desde:</label>
+        <input type="datetime-local" id="edit_fecha_desde" v-model="formularioEdicion.fechaDesde" required>
+      </div>
+      <div class="input-group" style="flex: 1;">
+        <label for="edit_fecha_hasta">Ocultar el:</label>
+        <input type="datetime-local" id="edit_fecha_hasta" v-model="formularioEdicion.fechaHasta" required>
+      </div>
+    </div>
+
+    <div class="form-actions" style="margin-top: 1rem;">
+      <button type="submit" class="btn-primary">Guardar cambios</button>
+      <button type="button" class="btn-secondary" @click="cancelarEdicion">Cancelar</button>
+    </div>
+  </form>
+</div>
+          
           </div>
         </div>
 
@@ -162,23 +277,31 @@
             <button type="submit" class="btn-primary">Publicar Mensaje</button>
           </form>
           <div class="preview-container">
-
-          <h4>Vista Previa del aviso</h4>
-          <div class="totem-mockup">
-            <!-- Si el input está vacío se muestra esto por defecto -->
-            <h2>{{ formularioAviso.titulo || 'Titulo' }}</h2>
-            <p>{{ formularioAviso.contenido || 'Sin contenido' }}</p>
+            <h4>Vista Previa en Pantalla</h4>
+            
+            <div class="totem-mockup-header">
+              <div class="totem-mockup-logo">
+                <img src="../assets/unpaz.png" alt="Logo Universidad" />
+              </div>
+              
+              <div class="ticker-wrapper">
+                <div class="ticker-track">
+                  <span class="ticker-item">
+                    <span class="ticker-title">{{ formularioAviso.titulo || 'Título de ejemplo' }}</span>: {{ formularioAviso.contenido || 'El texto de tu aviso se deslizará por aquí...' }}
+                    <span class="ticker-separator"> | </span>
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-        </div>
-
       </div>
     </main>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import api, { clearAuthSession } from '../services/app.js'
 
@@ -186,14 +309,25 @@ const router = useRouter()
 const totalAvisos = ref(0)
 const vistaActual = ref('ver-avisos')
 const listaAvisos = ref([])
-const formularioAviso = ref({ titulo: '', contenido: '' })
-const formularioEdicion = ref({ titulo: '', contenido: '' })
+const formularioAviso = ref({ titulo: '', contenido: '', id_edificio: '', fechaDesde: '', fechaHasta: '' })
 const avisoEditandoId = ref(null)
 const isLoading = ref(false)
 
+// ORDENAMIENTO
+const ordenFecha = ref('desc')
+const avisosOrdenados = computed(() => {
+  return [...listaAvisos.value].sort((a, b) => {
+    const fechaA = new Date(a.fecha_publicacion).getTime()
+    const fechaB = new Date(b.fecha_publicacion).getTime()
+    return ordenFecha.value === 'desc' ? fechaB - fechaA : fechaA - fechaB
+  })
+})
+
+// FORMULARIO EDICION ÚNICO
+const formularioEdicion = ref({ titulo: '', contenido: '', fechaDesde: '', fechaHasta: '' })
+
 const obtenerAvisos = async () => {
   isLoading.value = true
-
   try {
     const { data } = await api.get('/avisos')
     const avisos = Array.isArray(data) ? data : []
@@ -201,17 +335,13 @@ const obtenerAvisos = async () => {
     totalAvisos.value = avisos.length
   } catch (error) {
     console.error('Error al cargar avisos:', error)
-    alert('No se pudieron cargar los avisos. Intentá nuevamente.')
   } finally {
     isLoading.value = false
   }
 }
 
 const crearAviso = async () => {
-  if (!formularioAviso.value.titulo.trim() || !formularioAviso.value.contenido.trim()) {
-    alert('Completá título y contenido antes de publicar.')
-    return
-  }
+  if (!formularioAviso.value.titulo.trim() || !formularioAviso.value.contenido.trim()) return
 
   try {
     const fechaPub = formularioAviso.value.fechaDesde.replace('T', ' ') + ':00';
@@ -230,52 +360,51 @@ const crearAviso = async () => {
       edificios: arregloEdificios,
       carreras: []
     }
+    
     await api.post('/avisos', nuevoAviso)
 
-    alert('¡Aviso publicado correctamente!')
     formularioAviso.value = { titulo: '', contenido: '', id_edificio: '', fechaDesde: '', fechaHasta: '' }
-    
     await obtenerAvisos()
     vistaActual.value = 'ver-avisos'
   } catch (error) {
-    const mensaje = error.response?.data?.mensaje || error.response?.data?.message || 'No se pudo publicar el aviso.'
-    alert(mensaje)
+    console.error('No se pudo publicar el aviso:', error)
   }
 }
 
 const iniciarEdicion = (aviso) => {
   avisoEditandoId.value = aviso.id_aviso
+  
+  const formatToInput = (dateStr) => {
+    if (!dateStr) return '';
+    return dateStr.slice(0, 16).replace(' ', 'T');
+  };
+
   formularioEdicion.value = {
     titulo: aviso.titulo || '',
-    contenido: aviso.descripcion || aviso.contenido || ''
+    contenido: aviso.descripcion || aviso.contenido || '',
+    fechaDesde: formatToInput(aviso.fecha_publicacion),
+    fechaHasta: formatToInput(aviso.fecha_vencimiento)
   }
 }
 
 const cancelarEdicion = () => {
   avisoEditandoId.value = null
-  formularioEdicion.value = { titulo: '', contenido: '' }
+  formularioEdicion.value = { titulo: '', contenido: '', fechaDesde: '', fechaHasta: '' }
 }
 
 const guardarEdicionAviso = async () => {
   if (!avisoEditandoId.value) return
-
-  if (!formularioEdicion.value.titulo.trim() || !formularioEdicion.value.contenido.trim()) {
-    alert('Completá título y contenido antes de guardar los cambios.')
-    return
-  }
+  if (!formularioEdicion.value.titulo.trim() || !formularioEdicion.value.contenido.trim()) return
 
   try {
-    const fechaActual = new Date().toISOString().slice(0, 19).replace('T', ' ')
-    const fechaVencimiento = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .slice(0, 19)
-      .replace('T', ' ')
+    const fechaPub = formularioEdicion.value.fechaDesde.replace('T', ' ') + ':00';
+    const fechaVenc = formularioEdicion.value.fechaHasta.replace('T', ' ') + ':00';
 
     const avisoActualizado = {
       titulo: formularioEdicion.value.titulo.trim(),
       descripcion: formularioEdicion.value.contenido.trim(),
-      fecha_publicacion: fechaActual,
-      fecha_vencimiento: fechaVencimiento,
+      fecha_publicacion: fechaPub,
+      fecha_vencimiento: fechaVenc,
       id_categoria: 1,
       edificios: [],
       carreras: []
@@ -283,27 +412,67 @@ const guardarEdicionAviso = async () => {
 
     await api.put(`/avisos/${avisoEditandoId.value}`, avisoActualizado)
 
-    alert('Aviso actualizado correctamente.')
     cancelarEdicion()
     await obtenerAvisos()
   } catch (error) {
-    const mensaje = error.response?.data?.mensaje || error.response?.data?.message || 'No se pudo editar el aviso.'
-    alert(mensaje)
+    console.error('No se pudo editar el aviso:', error)
   }
 }
 
 const eliminarAviso = async (id) => {
-  const confirmado = confirm('¿Estás seguro de eliminar este aviso definitivamente?')
-  if (!confirmado) return
-
   try {
     await api.delete(`/avisos/${id}`)
-    alert('Aviso eliminado correctamente.')
     await obtenerAvisos()
   } catch (error) {
-    const mensaje = error.response?.data?.mensaje || error.response?.data?.message || 'Error al intentar eliminar el aviso.'
-    alert(mensaje)
+    console.error('Error al intentar eliminar el aviso:', error)
   }
+}
+
+// --- MATERIAS Y CURSADAS ---
+const formularioCursada = ref({
+  dia: '', hora_inicio: '', hora_fin: '', nombre: '', 
+  comision: '', modalidad: '', modalidad_combo: '', periodicidad: '', aula: ''
+})
+
+const crearCursada = async () => {
+  if (!formularioCursada.value.nombre.trim() || !formularioCursada.value.dia) return;
+
+  try {
+    await api.post('/cursadas', formularioCursada.value);
+    formularioCursada.value = { 
+      dia: '', hora_inicio: '', hora_fin: '', nombre: '', 
+      comision: '', modalidad: '', modalidad_combo: '', periodicidad: '', aula: '' 
+    };
+  } catch (error) {
+    console.error('Error al guardar cursada:', error);
+  }
+}
+
+const listaMaterias = ref([]);
+const formularioMateria = ref({
+  nombre: '', comision: '', dia: '', hora_inicio: '', hora_fin: '', 
+  modalidad: '', modalidad_combo: '', periodicidad: '', edificio: '', aula: ''
+});
+
+const obtenerMaterias = async () => {
+  try {
+    const { data } = await api.get('/materias'); 
+    listaMaterias.value = Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error('Error al cargar materias:', error);
+  }
+};
+
+const calcularEstado = (fechaPub, fechaVenc) => {
+  if (!fechaPub || !fechaVenc) return 'Desconocido'
+  
+  const ahora = new Date().getTime()
+  const pub = new Date(fechaPub).getTime()
+  const venc = new Date(fechaVenc).getTime()
+
+  if (ahora < pub) return 'Programado' 
+  if (ahora >= pub && ahora <= venc) return 'Activo'
+  return 'Vencido'
 }
 
 const logout = () => {
@@ -313,11 +482,13 @@ const logout = () => {
 
 onMounted(() => {
   obtenerAvisos()
+  obtenerMaterias(); 
 })
 </script>
 
+
 <style scoped>
-/* --- ESTRUCTURA PRINCIPAL --- */
+/* Estructura gral */
 .dashboard-layout {
   display: flex;
   min-height: 100vh;
@@ -435,7 +606,7 @@ onMounted(() => {
   border-top: 4px solid #00A8E8;
 }
 
-/* --- TABLAS (VER MSJ) --- */
+/* TABLAS */
 .data-table {
   width: 100%;
   border-collapse: collapse;
@@ -526,29 +697,68 @@ onMounted(() => {
   padding-top: 1.5rem;
   border-top: 1px dashed #ccc;
 }
-.totem-mockup {
-  background-color: #00A8E8;
-  color: white;
-  padding: 2rem;
+
+/* Simulador del Header del Totem */
+.totem-mockup-header {
+  background-color: #0A192F;
+  color: #FFFFFF;
+  padding: 1rem 1.5rem;
   border-radius: 8px;
-  min-height: 150px;
   display: flex;
-  flex-direction: column;
-  justify-content: center;
   align-items: center;
-  text-align: center;
+  border-bottom: 5px solid #FFD700;
+  overflow: hidden;
+  margin-top: 1rem;
 }
 
-
-/* --- FORMULARIO (CREAR MSJ) --- */
-/*.form-crear {
-  margin-top: 1.5rem;
+.totem-mockup-logo {
+  flex-shrink: 0;
+  margin-right: 1.5rem;
   display: flex;
-  flex-direction: column;
-  gap: 1.2rem;
-  max-width: 600px;
+  justify-content: center;
 }
-*/
+
+.totem-mockup-logo img {
+  width: 100%;
+  max-width: 140px; 
+  height: auto;
+  object-fit: contain;
+}
+
+/* Cinta animada */
+.ticker-wrapper {
+  flex-grow: 1;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.ticker-track {
+  display: inline-block;
+  padding-left: 100%;
+  /* Animación más rápida en la vista previa para no hacerte esperar */
+  animation: marquee 12s linear infinite; 
+}
+
+.ticker-item {
+  font-size: 1.3rem; 
+}
+
+.ticker-title {
+  font-weight: bold;
+  color: #FFD700;
+}
+
+.ticker-separator {
+  margin: 0 1.5rem;
+  color: #00A8E8;
+}
+
+@keyframes marquee {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(-100%, 0); }
+}
+
+
 .edit-panel {
   margin-top: 1.5rem;
   padding: 1.25rem;
