@@ -89,18 +89,31 @@ const noticias = ref([])
 
 const cargarNoticias = async () => {
   try {
-    const { data } = await api.get('/avisos')
-    const ahoraMs = new Date().getTime() 
+    // El '?t=' obliga al navegador a no usar caché y buscar la verdad en la base de datos
+    const { data } = await api.get('/avisos?t=' + new Date().getTime());
+    if (!Array.isArray(data)) return;
+
+    const ahoraMs = new Date().getTime(); 
     
+    // Función blindada: Extrae solo los números e ignora los formatos con "Z" o "T"
+    const fechaLocalPrecisa = (fechaString) => {
+      if (!fechaString) return 0;
+      const partes = String(fechaString).match(/\d+/g); 
+      if (!partes || partes.length < 5) return 0;
+      // Arma la fecha forzando la zona horaria del sistema en el que estás
+      return new Date(partes[0], partes[1] - 1, partes[2], partes[3], partes[4], partes[5] || 0).getTime();
+    };
+
     const avisosActivos = data.filter(aviso => {
-      const pubMs = new Date(aviso.fecha_publicacion).getTime()
-      const vencMs = new Date(aviso.fecha_vencimiento).getTime()
-      return ahoraMs >= pubMs && ahoraMs <= vencMs
-    })
-    noticias.value = avisosActivos
+      const pubMs = fechaLocalPrecisa(aviso.fecha_publicacion);
+      const vencMs = fechaLocalPrecisa(aviso.fecha_vencimiento);
+      return ahoraMs >= pubMs && ahoraMs <= vencMs;
+    });
+    
+    noticias.value = avisosActivos;
   } catch (error) {
-    console.error('Error al cargar noticias en el totem:', error)
-    noticias.value = []
+    console.error('Error al cargar noticias en el totem:', error);
+    noticias.value = [];
   }
 }
 

@@ -21,9 +21,9 @@
             {{ isLoading ? 'Ingresando...' : 'Ingresar al Sistema' }}
           </button>
         </form>
-        <div class="extra-links">
+        <!-- <div class="extra-links">
           <router-link to="/registrar">¿No tienes cuenta? Regístrese acá</router-link>
-        </div>
+        </div<-->
   </div>
 </div>
 </template>

@@ -8,12 +8,12 @@
       </div>
       <nav class="sidebar-nav">
         <ul>
+          <li v-if="rolUsuario === 'Administrador'" :class="{ active: vistaActual === 'usuarios' }" @click="vistaActual = 'usuarios'">Gestión de Usuarios</li>
           <li :class="{ active: vistaActual === 'inicio' }" @click="vistaActual = 'inicio'">Inicio</li>
           <li :class="{ active: vistaActual === 'horarios' }" @click="vistaActual = 'horarios'">Horarios</li>
           <li :class="{ active: vistaActual === 'materias' }" @click="vistaActual = 'materias'">Materias</li>
           <li :class="{ active: vistaActual === 'aulas' }" @click="vistaActual = 'aulas'">Aulas</li>
           <li :class="{ active: vistaActual === 'ver-avisos' }" @click="vistaActual = 'ver-avisos'">Ver Avisos</li>
-          <li :class="{ active: vistaActual === 'crear-aviso' }" @click="vistaActual = 'crear-aviso'">Crear Aviso</li>
         </ul>
       </nav>
       <div class="sidebar-footer">
@@ -24,7 +24,20 @@
     <main class="dashboard-content">
       <header class="content-header">
         <h1>Gestión de avisos</h1>
-        <div class="user-info">admin@universidad.edu.ar</div>
+        
+        <div style="display: flex; align-items: center; gap: 1.5rem;">
+          <!-- Selector de Vista (Solo visible si su rol real en el token es Administrador) -->
+          <div v-if="rolRealUsuario === 'Administrador'" style="display: flex; align-items: center; gap: 0.5rem; background: #f0f2f5; padding: 0.5rem 1rem; border-radius: 8px;">
+            <label for="simulador-rol" style="font-size: 0.85rem; color: #666; font-weight: bold; margin: 0;">Ver como:</label>
+            <select id="simulador-rol" v-model="rolUsuario" style="border: none; background: transparent; font-weight: bold; color: #00A8E8; outline: none; cursor: pointer;">
+              <option value="Administrador">Administrador</option>
+              <option value="Supervisor">Supervisor</option>
+              <option value="Editor">Editor</option>
+            </select>
+          </div>
+          
+          <div class="user-info">admin@universidad.edu.ar</div>
+        </div>
       </header>
       
       <div class="content-body">
@@ -159,149 +172,179 @@
 
         <!-- MOCKUP: VER AVISOS -->
         <div v-else-if="vistaActual === 'ver-avisos'" class="card-placeholder fade-in">
-          <h3>Lista de avisos</h3>
-          <p>Avisos que se están mostrando actualmente</p>
-
-          <div v-if="isLoading" class="table-loading">Cargando avisos...</div>
-
-          <div v-else>
-            <!-- 1. Hacemos que la cabecera "Fecha" sea un botón para ordenar -->
-<table class="data-table">
-  <thead>
-    <tr>
-      <th>ID</th>
-      <th>Título</th>
-      <th @click="ordenFecha = ordenFecha === 'desc' ? 'asc' : 'desc'" style="cursor: pointer; user-select: none; color: #00A8E8;">
-        Fecha <span v-if="ordenFecha === 'desc'">▼</span><span v-else>▲</span>
-      </th>
-      <th>Estado</th>
-      <th>Acciones</th>
-    </tr>
-  </thead>
-  <tbody>
-    <!-- 2. Cambiamos "listaAvisos" por la nueva variable "avisosOrdenados" -->
-    <tr v-for="aviso in avisosOrdenados" :key="aviso.id_aviso">
-      <td>{{ aviso.id_aviso }}</td>
-      <td>{{ aviso.titulo }}</td>
-      <td>{{ new Date(aviso.fecha_publicacion).toLocaleDateString('es-AR') }}</td>
-      <td>
-        <span :class="{'badge active': calcularEstado(aviso.fecha_publicacion, aviso.fecha_vencimiento) === 'Activo', 'badge inactive': calcularEstado(aviso.fecha_publicacion, aviso.fecha_vencimiento) === 'Vencido', 'badge BORRADOR': calcularEstado(aviso.fecha_publicacion, aviso.fecha_vencimiento) === 'Programado'}">
-          {{ calcularEstado(aviso.fecha_publicacion, aviso.fecha_vencimiento) }}
-        </span>
-      </td>
-      <td>
-        <div class="table-actions">
-          <button class="btn-sm edit" @click="iniciarEdicion(aviso)">Editar</button>
-          <button class="btn-sm delete" @click="eliminarAviso(aviso.id_aviso)">Borrar</button>
-        </div>
-      </td>
-    </tr>
-  </tbody>
-</table>
-
-<!-- 3. Agregamos los inputs de fecha al formulario de edición -->
-<div v-if="avisoEditandoId !== null" class="edit-panel">
-  <h4>Editar aviso</h4>
-  <form @submit.prevent="guardarEdicionAviso" class="form-crear">
-    <div class="input-group">
-      <label for="titulo-editar">Título del Aviso</label>
-      <input id="titulo-editar" v-model="formularioEdicion.titulo" type="text" required>
-    </div>
-
-    <div class="input-group">
-      <label for="contenido-editar">Contenido / Detalles</label>
-      <textarea id="contenido-editar" v-model="formularioEdicion.contenido" rows="4" required></textarea>
-    </div>
-
-    <!-- NUEVO: Campos para editar los horarios -->
-    <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-      <div class="input-group" style="flex: 1;">
-        <label for="edit_fecha_desde">Mostrar desde:</label>
-        <input type="datetime-local" id="edit_fecha_desde" v-model="formularioEdicion.fechaDesde" required>
-      </div>
-      <div class="input-group" style="flex: 1;">
-        <label for="edit_fecha_hasta">Ocultar el:</label>
-        <input type="datetime-local" id="edit_fecha_hasta" v-model="formularioEdicion.fechaHasta" required>
-      </div>
-    </div>
-
-    <div class="form-actions" style="margin-top: 1rem;">
-      <button type="submit" class="btn-primary">Guardar cambios</button>
-      <button type="button" class="btn-secondary" @click="cancelarEdicion">Cancelar</button>
-    </div>
-  </form>
-</div>
           
+          <!-- Encabezado con título a la izquierda y botón a la DERECHA -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <div>
+              <h3 style="margin: 0;">Lista de avisos</h3>
+              <p style="margin: 0; color: #666;">Avisos que se están mostrando actualmente</p>
+            </div>
+            <!-- Botón Crear Aviso (Bloqueado para Supervisor) -->
+            <button  class="btn-primary" @click="mostrarModalCrearAviso = true" style="margin: 0;">+ Crear Aviso</button>
+          </div>
+
+          <!-- TABLA DE AVISOS CON MATRIZ DE PERMISOS -->
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Título</th>
+                <th @click="ordenFecha = ordenFecha === 'desc' ? 'asc' : 'desc'" style="cursor: pointer; user-select: none; color: #00A8E8;">
+                  Fecha <span v-if="ordenFecha === 'desc'">▼</span><span v-else>▲</span>
+                </th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="aviso in avisosOrdenados" :key="aviso.id_aviso">
+                <td>{{ aviso.id_aviso }}</td>
+                <td>{{ aviso.titulo }}</td>
+                <td>{{ new Date(aviso.fecha_publicacion).toLocaleDateString('es-AR') }}</td>
+                
+                <!-- COLUMNA ESTADO -->
+                <td>
+                  <span :class="calcularEstadoClase(aviso)">
+                    {{ calcularEstadoTexto(aviso) }}
+                  </span>
+                </td>
+                
+                <!-- COLUMNA ACCIONES CON PERMISOS -->
+                <td>
+                  <div class="table-actions">
+                    <!-- EDITAR: Solo Admin y Editor -->
+                    <button class="btn-sm edit" @click="iniciarEdicion(aviso)">Editar</button>
+                    
+                    <!-- BORRAR: Solo Admin y Supervisor -->
+                    <button v-if="rolUsuario === 'Administrador' || rolUsuario === 'Supervisor'" class="btn-sm delete" @click="eliminarAviso(aviso.id_aviso)">Borrar</button>
+                    
+                    <!-- APROBAR / RECHAZAR: Solo Admin y Supervisor -->
+                    <button v-if="(rolUsuario === 'Administrador' || rolUsuario === 'Supervisor') && aviso.estado_aprobacion === 'En revision'" class="btn-sm" style="background-color: #10b981; color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer;" @click="cambiarEstadoAviso(aviso.id_aviso, 'Aprobado')">Aprobar</button>
+                    
+                    <button v-if="(rolUsuario === 'Administrador' || rolUsuario === 'Supervisor') && aviso.estado_aprobacion === 'En revision'" class="btn-sm" style="background-color: #f59e0b; color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer;" @click="cambiarEstadoAviso(aviso.id_aviso, 'Rechazado')">Rechazar</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- PANEL DE EDICIÓN DE AVISOS -->
+          <div v-if="avisoEditandoId !== null" class="edit-panel" style="margin-top: 2rem;">
+            <h4>Editar aviso</h4>
+            <form @submit.prevent="guardarEdicionAviso" class="form-crear">
+              <div class="input-group">
+                <label for="titulo-editar">Título del Aviso</label>
+                <input id="titulo-editar" v-model="formularioEdicion.titulo" type="text" required>
+              </div>
+
+              <div class="input-group">
+                <label for="contenido-editar">Contenido / Detalles</label>
+                <textarea id="contenido-editar" v-model="formularioEdicion.contenido" rows="4" required></textarea>
+              </div>
+
+              <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                <div class="input-group" style="flex: 1;">
+                  <label for="edit_fecha_desde">Mostrar desde:</label>
+                  <input type="datetime-local" id="edit_fecha_desde" v-model="formularioEdicion.fechaDesde" required>
+                </div>
+                <div class="input-group" style="flex: 1;">
+                  <label for="edit_fecha_hasta">Ocultar el:</label>
+                  <input type="datetime-local" id="edit_fecha_hasta" v-model="formularioEdicion.fechaHasta" required>
+                </div>
+              </div>
+
+              <div class="form-actions" style="margin-top: 1rem;">
+                <button type="submit" class="btn-primary">Guardar cambios</button>
+                <button type="button" class="btn-secondary" @click="cancelarEdicion">Cancelar</button>
+              </div>
+            </form>
           </div>
         </div>
 
-        <!-- MOCKUP: CREAR AVISO -->
-        <div v-else-if="vistaActual === 'crear-aviso'" class="card-placeholder fade-in">
-          <h3>Crear Nuevo Mensaje</h3>
-          <p>Escriba un nuevo aviso para publicarlo en las pantallas de la uni</p>
-          
-          <form @submit.prevent="crearAviso" class="form-crear">
+        <!-- POPUP MODAL: CREAR AVISO -->
+        <div v-if="mostrarModalCrearAviso" class="modal-overlay" @click.self="mostrarModalCrearAviso = false">
+          <div class="modal-content fade-in" style="max-width: 950px;"> 
+            <button class="close-modal" @click="mostrarModalCrearAviso = false">✖</button>
             
-            <div class="input-group">
-              <label for="titulo">Título del Aviso</label>
-              <input type="text" id="titulo" v-model="formularioAviso.titulo" placeholder="Ej: Cambio de aula para ...." required>
-            </div>
-
-            <div class="input-group">
-              <label for="edificio">Edificio al que pertenece</label>
-              <select id="edificio" v-model="formularioAviso.id_edificio" class="dark-select">
-                <option value="">-- Todos los edificios --</option>
-                <option :value="1">Sede Alem (Central)</option>
-                <option :value="2">Sede Pueyrredón (CEM)</option>
-                <option :value="3">Sede Arregui (Medicina)</option>
-              </select>
-            </div>
-            <div class="input-group">
-              <label for="contenido">Contenido / Detalles</label>
-              <textarea id="contenido" rows="4" v-model="formularioAviso.contenido" placeholder="Cuerpo del mensaje (máx 100 caracteres)..." maxlength="100" required></textarea>
-              <small style="text-align: right; color: #666; font-weight: bold;">
-                {{ formularioAviso.contenido.length }} / 100
-              </small>
-            </div>
-            <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-              <div class="input-group" style="flex: 1;">
-                <label for="fecha_desde">Mostrar desde:</label>
-                <input type="datetime-local" id="fecha_desde" v-model="formularioAviso.fechaDesde" required>
-              </div>
-
-              <div class="input-group" style="flex: 1;">
-                <label for="fecha_hasta">Ocultar el:</label>
-                <input type="datetime-local" id="fecha_hasta" v-model="formularioAviso.fechaHasta" required>
-              </div>
-            </div>
-            <button type="submit" class="btn-primary">Publicar Mensaje</button>
-          </form>
-          <div class="preview-container">
-            <h4>Vista Previa en Pantalla</h4>
+            <h3>Crear Nuevo Mensaje</h3>
             
-            <div class="totem-mockup-header">
-              <div class="totem-mockup-logo">
-                <img src="../assets/unpaz.png" alt="Logo Universidad" />
+            <form @submit.prevent="crearAviso" class="form-crear">
+              <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+                
+                <div style="flex: 1; min-width: 300px;">
+                  <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                    <div class="input-group" style="flex: 1;">
+                      <label for="fecha_desde">Mostrar desde:</label>
+                      <input type="datetime-local" id="fecha_desde" v-model="formularioAviso.fechaDesde" required>
+                    </div>
+                    <div class="input-group" style="flex: 1;">
+                      <label for="fecha_hasta">Ocultar el:</label>
+                      <input type="datetime-local" id="fecha_hasta" v-model="formularioAviso.fechaHasta" required>
+                    </div>
+                  </div>
+
+                  <div class="input-group" style="margin-bottom: 1rem;">
+                    <label for="titulo">Título del Aviso</label>
+                    <input type="text" id="titulo" v-model="formularioAviso.titulo" placeholder="Ej: Cambio de aula..." required>
+                  </div>
+
+                  <div style="display: flex; gap: 1rem; align-items: flex-end;">
+                    <div class="input-group" style="flex: 1;">
+                      <label for="edificio">Edificio</label>
+                      <select id="edificio" v-model="formularioAviso.id_edificio" class="dark-select">
+                        <option value="">-- Todos --</option>
+                        <option :value="1">Sede Alem (Central)</option>
+                        <option :value="2">Sede Pueyrredón (CEM)</option>
+                        <option :value="3">Sede Arregui (Medicina)</option>
+                      </select>
+                    </div>
+                    <div class="input-group" style="flex: 1;">
+                      <button type="button" class="btn-secondary" style="padding: 0.8rem; width: 100%; height: 100%;">Seleccionar Deptos.</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column;">
+                  <div class="input-group" style="flex-grow: 1; display: flex; flex-direction: column;">
+                    <label for="contenido">Contenido / Detalles</label>
+                    <textarea id="contenido" v-model="formularioAviso.contenido" placeholder="Cuerpo del mensaje..." maxlength="100" required style="flex-grow: 1; resize: none; padding: 1rem;"></textarea>
+                    <small style="text-align: right; color: #666; font-weight: bold; margin-top: 0.3rem;">
+                      {{ formularioAviso.contenido.length }} / 100
+                    </small>
+                  </div>
+                  
+                  <button type="submit" class="btn-primary" style="width: 100%; margin-top: 0.5rem; padding: 1rem;">Publicar Mensaje</button>
+                </div>
               </div>
-              
-              <div class="ticker-wrapper">
-                <div class="ticker-track">
-                  <span class="ticker-item">
-                    <span class="ticker-title">{{ formularioAviso.titulo || 'Título de ejemplo' }}</span>: {{ formularioAviso.contenido || 'El texto de tu aviso se deslizará por aquí...' }}
-                    <span class="ticker-separator"> | </span>
-                  </span>
+            </form>
+
+            <div class="preview-container" style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px dashed #ccc;">
+              <h4 style="margin-top: 0;">Vista Previa en Pantalla</h4>
+              <div class="totem-mockup-header" style="margin-top: 0.5rem;">
+                <div class="totem-mockup-logo">
+                  <img src="../assets/unpaz.png" alt="Logo Universidad" />
+                </div>
+                <div class="ticker-wrapper">
+                  <div class="ticker-track">
+                    <span class="ticker-item">
+                      <span class="ticker-title">{{ formularioAviso.titulo || 'Título' }}</span>: {{ formularioAviso.contenido || 'El texto de tu anuncio aparecerá aquí...' }}
+                      <span class="ticker-separator">|</span>
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
+
           </div>
         </div>
+
       </div>
     </main>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import api, { clearAuthSession } from '../services/app.js'
 
@@ -312,16 +355,76 @@ const listaAvisos = ref([])
 const formularioAviso = ref({ titulo: '', contenido: '', id_edificio: '', fechaDesde: '', fechaHasta: '' })
 const avisoEditandoId = ref(null)
 const isLoading = ref(false)
+const mostrarModalCrearAviso = ref(false)
+
+const normalizarRol = (rol) => {
+  const clave = String(rol || '')
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+
+  const roles = {
+    admin: 'Administrador',
+    administrador: 'Administrador',
+    editor: 'Editor',
+    supervisor: 'Supervisor'
+  }
+
+  return roles[clave] || ''
+}
+
+const obtenerRolReal = () => {
+  try {
+    const token = localStorage.getItem('token')
+    const payload = token?.split('.')[1]
+
+    if (payload) {
+      const base64 = payload.replace(/-/g, '+').replace(/_/g, '/')
+      const datosToken = JSON.parse(atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '=')))
+      const rolToken = normalizarRol(datosToken.rol)
+      if (rolToken) return rolToken
+    }
+  } catch (error) {
+    console.warn('No se pudo leer el rol desde el token:', error)
+  }
+
+  return normalizarRol(localStorage.getItem('rol'))
+}
+
+// El rol real se obtiene del token y se usa como respaldo el valor guardado.
+const rolRealUsuario = obtenerRolReal()
+
+// El rol reactivo que controla qué botones y pestañas se muestran en la pantalla
+const rolUsuario = ref(rolRealUsuario);
+// Función para que Admin/Supervisor aprueben o rechacen
+
+
+// Función para que Admin y Supervisor aprueben o rechacen un aviso
+const cambiarEstadoAviso = async (id, nuevoEstado) => {
+  try {
+    // Enviamos el estado exacto tal como lo definimos en el ENUM de la base de datos ('Aprobado' o 'Rechazado')
+    await api.patch(`/avisos/${id}/estado`, { 
+      estado_aprobacion: nuevoEstado 
+    });
+    
+    // Refrescamos inmediatamente la lista de avisos para reflejar el cambio de color y estado
+    await obtenerAvisos();
+  } catch (error) {
+    console.error('Error al cambiar el estado del aviso:', error);
+    const mensaje = error.response?.data?.mensaje
+      || error.response?.data?.message
+      || (error.response
+        ? 'El servidor rechazó el cambio de estado.'
+        : 'No se pudo conectar con el backend. Verificá CORS y la conexión.');
+    alert(mensaje);
+  }
+};
+
 
 // ORDENAMIENTO
 const ordenFecha = ref('desc')
-const avisosOrdenados = computed(() => {
-  return [...listaAvisos.value].sort((a, b) => {
-    const fechaA = new Date(a.fecha_publicacion).getTime()
-    const fechaB = new Date(b.fecha_publicacion).getTime()
-    return ordenFecha.value === 'desc' ? fechaB - fechaA : fechaA - fechaB
-  })
-})
+
 
 // FORMULARIO EDICION ÚNICO
 const formularioEdicion = ref({ titulo: '', contenido: '', fechaDesde: '', fechaHasta: '' })
@@ -347,9 +450,7 @@ const crearAviso = async () => {
     const fechaPub = formularioAviso.value.fechaDesde.replace('T', ' ') + ':00';
     const fechaVenc = formularioAviso.value.fechaHasta.replace('T', ' ') + ':00';
 
-    const arregloEdificios = formularioAviso.value.id_edificio 
-      ? [Number(formularioAviso.value.id_edificio)] 
-      : [];
+    const arregloEdificios = formularioAviso.value.id_edificio ? [Number(formularioAviso.value.id_edificio)] : [];
 
     const nuevoAviso = {
       titulo: formularioAviso.value.titulo.trim(),
@@ -365,7 +466,9 @@ const crearAviso = async () => {
 
     formularioAviso.value = { titulo: '', contenido: '', id_edificio: '', fechaDesde: '', fechaHasta: '' }
     await obtenerAvisos()
-    vistaActual.value = 'ver-avisos'
+    
+    // Cerramos el popup al terminar
+    mostrarModalCrearAviso.value = false
   } catch (error) {
     console.error('No se pudo publicar el aviso:', error)
   }
@@ -463,17 +566,43 @@ const obtenerMaterias = async () => {
   }
 };
 
-const calcularEstado = (fechaPub, fechaVenc) => {
-  if (!fechaPub || !fechaVenc) return 'Desconocido'
-  
-  const ahora = new Date().getTime()
-  const pub = new Date(fechaPub).getTime()
-  const venc = new Date(fechaVenc).getTime()
+const fechaLocalPrecisa = (fechaString) => {
+  if (!fechaString) return 0;
+  const partes = String(fechaString).match(/\d+/g);
+  if (!partes || partes.length < 5) return 0;
+  return new Date(partes[0], partes[1] - 1, partes[2], partes[3], partes[4], partes[5] || 0).getTime();
+};
 
-  if (ahora < pub) return 'Programado' 
-  if (ahora >= pub && ahora <= venc) return 'Activo'
-  return 'Vencido'
-}
+const calcularEstadoTexto = (aviso) => {
+  if (aviso.estado_aprobacion === 'En revision') return 'En Revisión';
+  if (aviso.estado_aprobacion === 'Rechazado') return 'Rechazado';
+
+  // Si está aprobado, calculamos por fecha
+  const ahora = new Date().getTime();
+  const pub = fechaLocalPrecisa(aviso.fecha_publicacion);
+  const venc = fechaLocalPrecisa(aviso.fecha_vencimiento);
+
+  if (ahora < pub) return 'Programado';
+  if (ahora >= pub && ahora <= venc) return 'Activo';
+  return 'Vencido';
+};
+
+const calcularEstadoClase = (aviso) => {
+  const estado = calcularEstadoTexto(aviso);
+  if (estado === 'En Revisión') return 'badge BORRADOR';
+  if (estado === 'Rechazado') return 'badge inactive';
+  if (estado === 'Activo') return 'badge active';
+  if (estado === 'Vencido') return 'badge inactive';
+  return 'badge BORRADOR'; // Para Programado
+};
+
+const avisosOrdenados = computed(() => {
+  return [...listaAvisos.value].sort((a, b) => {
+    const fechaA = fechaLocalPrecisa(a.fecha_publicacion);
+    const fechaB = fechaLocalPrecisa(b.fecha_publicacion);
+    return ordenFecha.value === 'desc' ? fechaB - fechaA : fechaA - fechaB;
+  });
+});
 
 const logout = () => {
   clearAuthSession()
@@ -832,6 +961,49 @@ onMounted(() => {
 
 .btn-primary:hover {
   background-color: #008fca;
+}
+/* --- POPUP / MODAL CREAR AVISO --- */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(10, 25, 47, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  background-color: white;
+  padding: 2.5rem;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 1000px;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.close-modal {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  font-weight: bold;
+  cursor: pointer;
+  color: #a0aec0;
+  transition: color 0.2s;
+}
+
+.close-modal:hover {
+  color: #e53e3e;
 }
 
 </style>
